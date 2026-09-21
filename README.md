@@ -21,7 +21,7 @@ Factor Forge Public 是一个面向量化研究、因果回放、模拟交易和
 
 位置：`factor_forge_public.data`
 
-负责定义统一的数据提供接口。历史数据库、文件和实时行情服务都可以实现 `MarketDataProvider`，但必须只返回指定时间点之前已经收盘的 K 线。公开版不包含任何交易所密钥、第三方付费数据或真实历史数据库。
+负责定义统一的数据提供接口。历史数据库、文件和实时行情服务都可以实现 `MarketDataProvider`，但必须只返回指定时间点之前已经收盘的 K 线。`PollingScheduler` 负责与网络无关的采集任务调度，数据健康门负责检查历史长度、连续性、未来数据、未收盘数据和行情陈旧度。公开版不包含任何交易所密钥、第三方付费数据或真实历史数据库。
 
 #### 2. 标准数据模型
 
@@ -33,13 +33,13 @@ Factor Forge Public 是一个面向量化研究、因果回放、模拟交易和
 
 位置：`factor_forge_public.factors`
 
-负责从历史可见数据生成可复现特征。当前包含因果版本的平均 K 线转换。原始 K 线仍然是事实数据，衍生 K 线只用于研究和策略判断。
+负责从历史可见数据生成可复现特征。`FactorRegistry` 提供统一注册和目录，当前包含因果版本的平均 K 线转换与 K 线形态因子。原始 K 线仍然是事实数据，衍生 K 线只用于研究和策略判断。
 
 #### 4. 研究与事件分析
 
 位置：`factor_forge_public.research`
 
-负责事件检测、前向收益标注、最大有利波动、最大不利波动和汇总统计。事件先被独立检测，未来收益只能在离线评价阶段计算，不能反向进入事件条件。
+负责事件检测、前向收益标注、最大有利波动、最大不利波动和汇总统计。还提供严格按时间排序的训练/测试切分、扩展窗口 walk-forward、额外成本压力和删除最佳交易测试。事件先被独立检测，未来收益只能在离线评价阶段计算，不能反向进入事件条件。
 
 #### 5. 统一策略接口
 
@@ -63,7 +63,7 @@ Factor Forge Public 是一个面向量化研究、因果回放、模拟交易和
 
 位置：`factor_forge_public.live`
 
-实时入口接收最新的已收盘 K 线快照，并调用与回放完全相同的 `SignalEngine` 和策略对象。该入口只生成信号，不包含交易所请求。
+实时入口接收最新的已收盘 K 线快照，并调用与回放完全相同的 `SignalEngine` 和策略对象。通用异步事件总线会隔离订阅者故障，线程安全的 `MarketState` 保存当前和最近已收盘 K 线。该入口只生成信号，不包含交易所请求。
 
 #### 9. 风控与仓位管理
 
@@ -101,6 +101,12 @@ Factor Forge Public 是一个面向量化研究、因果回放、模拟交易和
 位置：`factor_forge_public.monitoring`
 
 负责记录数据、信号、风控和执行阶段的结构化事件。当前公开版提供内存审计实现，实际项目可以扩展到数据库或日志平台。
+
+#### 14. 统一运行配置
+
+位置：`factor_forge_public.config`
+
+负责用同一份配置描述回放、模拟盘和私有实盘适配器的本金、仓位比例、杠杆、手续费、滑点和风险上限，避免不同运行模式悄悄使用不同假设。
 
 ### 统一运行链路
 
@@ -176,21 +182,23 @@ exchange implementations.
 ### System modules
 
 1. **Market data** (`factor_forge_public.data`) defines a vendor-neutral,
-   point-in-time candle provider interface.
+   point-in-time provider, pure polling scheduler, and causal data-health gate.
 2. **Models** (`factor_forge_public.models`) validate normalized OHLCV candles
    and research events.
-3. **Factors** (`factor_forge_public.factors`) calculate reproducible features,
-   including a causal Heikin-Ashi transformation.
-4. **Research** (`factor_forge_public.research`) detects events and evaluates
-   forward returns and favorable/adverse excursions offline.
+3. **Factors** (`factor_forge_public.factors`) provide a registry and calculate
+   reproducible candle-shape and causal Heikin-Ashi features.
+4. **Research** (`factor_forge_public.research`) detects events, evaluates
+   forward returns, builds walk-forward splits, and runs cost and best-trade
+   removal stress tests.
 5. **Unified strategies** (`factor_forge_public.strategy`, `.runtime`) expose
    one deterministic `Strategy.evaluate()` method for every runtime mode.
 6. **Signal engine** (`factor_forge_public.engine`) routes validated inputs to a
    registered strategy.
 7. **Replay** (`factor_forge_public.replay`) advances one closed candle at a time
    without exposing future observations.
-8. **Live/paper input** (`factor_forge_public.live`) evaluates a closed snapshot
-   through the same engine and strategy used by replay.
+8. **Live/paper input and realtime state** (`factor_forge_public.live`,
+   `.realtime`) evaluate closed snapshots, isolate event-handler failures, and
+   maintain thread-safe current and last-closed candle state.
 9. **Risk and sizing** (`factor_forge_public.risk`, `.execution.sizing`) enforce
    exposure limits and calculate exchange-compatible quantities.
 10. **Execution models and orchestration** (`factor_forge_public.execution`)
@@ -202,6 +210,8 @@ exchange implementations.
     exchange-specific signing code.
 13. **Audit and observability** (`factor_forge_public.monitoring`) record
     structured decisions across the research and execution pipeline.
+14. **Runtime profiles** (`factor_forge_public.config`) keep capital, cost,
+    sizing, leverage, and guard assumptions aligned across runtime modes.
 
 ### One strategy, multiple runtimes
 
