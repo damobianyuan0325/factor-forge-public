@@ -14,11 +14,11 @@ secrets/
 *.key
 *.p12
 
-data/
-logs/
-outputs/
-tmp/
-backups/
+/data/
+/logs/
+/outputs/
+/tmp/
+/backups/
 *.sqlite
 *.sqlite3
 *.db
