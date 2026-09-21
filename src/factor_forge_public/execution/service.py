@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from uuid import uuid4
-
 from pydantic import BaseModel
 
 from factor_forge_public.brokers.base import Broker
 from factor_forge_public.execution.models import Fill, OrderRequest, OrderSide, OrderType
+from factor_forge_public.execution.idempotency import deterministic_client_order_id
 from factor_forge_public.risk.engine import RiskDecision, RiskEngine
 from factor_forge_public.runtime import Decision, SignalPlan
 
@@ -31,12 +30,13 @@ class ExecutionService:
         *,
         quantity: float,
         timestamp_ms: int,
+        client_order_id: str | None = None,
     ) -> ExecutionResult:
         if plan.decision == Decision.FLAT:
             return ExecutionResult(submitted=False, reason="flat_signal")
 
         order = OrderRequest(
-            client_order_id=f"research-{uuid4().hex}",
+            client_order_id=client_order_id or deterministic_client_order_id(plan),
             symbol=plan.symbol,
             side=OrderSide.BUY if plan.decision == Decision.LONG else OrderSide.SELL,
             quantity=quantity,

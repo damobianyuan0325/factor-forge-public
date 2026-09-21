@@ -3,4 +3,4 @@
 from factor_forge_public.models import Candle, ResearchEvent
 
 __all__ = ["Candle", "ResearchEvent"]
-__version__ = "0.3.0"
+__version__ = "0.4.0"

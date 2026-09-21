@@ -8,6 +8,7 @@ from factor_forge_public.execution.models import (
     Position,
 )
 from factor_forge_public.execution.sizing import InstrumentRules, PositionSize, size_by_equity_fraction
+from factor_forge_public.execution.idempotency import deterministic_client_order_id
 
 __all__ = [
     "AccountSnapshot",
@@ -20,4 +21,5 @@ __all__ = [
     "InstrumentRules",
     "PositionSize",
     "size_by_equity_fraction",
+    "deterministic_client_order_id",
 ]

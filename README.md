@@ -1,9 +1,9 @@
 # Factor Forge Public
 
-[![Version](https://img.shields.io/badge/version-v0.3.0-blue)](https://github.com/damobianyuan0325/factor-forge-public/tree/v0.3.0)
+[![Version](https://img.shields.io/badge/version-v0.4.0-blue)](https://github.com/damobianyuan0325/factor-forge-public/tree/v0.4.0)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-13%20passed-brightgreen)](#测试与质量门禁)
+[![Tests](https://img.shields.io/badge/tests-23%20passed-brightgreen)](#测试与质量门禁)
 
 量化研究、因果回放、模拟交易与交易系统架构工具箱。
 
@@ -22,10 +22,10 @@ Factor Forge Public 将真实量化系统中具有通用价值的架构重新实
 
 ### 当前版本
 
-- 版本：`v0.3.0`
+- 版本：`v0.4.0`
 - Python：`>= 3.11`
 - 许可证：MIT
-- 测试：18 项通过
+- 测试：23 项通过
 - 默认执行环境：研究与模拟盘
 - 真实交易所：只提供抽象接口，不提供可直接下单的实现
 
@@ -81,9 +81,11 @@ Factor Forge Public 将真实量化系统中具有通用价值的架构重新实
 | 实时入口 | 已收盘快照、事件总线、线程安全市场状态 | 已提供 |
 | 模拟盘 | 市价/限价模拟、费用、滑点、持仓和盈亏 | 已提供简化模型 |
 | 风控 | 单笔、总敞口、权益比例和最低权益限制 | 已提供基础门禁 |
+| 组合风控 | 最大持仓数、单日亏损和连续亏损熔断 | 已提供会话级门禁 |
 | 执行编排 | 信号转订单、风控前置、Broker 调用 | 已提供 |
 | 执行可靠性 | 订单状态机、读请求退避、写超时先对账、精确 payload 审批 | 已提供通用组件 |
-| 审计 | 结构化研究和执行事件 | 已提供内存实现 |
+| 幂等执行 | 相同策略决策生成确定性客户端订单号 | 已提供 |
+| 审计 | 结构化研究和执行事件 | 已提供内存及 SQLite 实现 |
 | 数据导入 | 标准 CSV 解析、去重和决策时点可得性检查 | 已提供 |
 | 绩效统计 | 复利收益、最大回撤、胜率、Profit Factor、连续亏损 | 已提供 |
 | 通知 | 无外发的协议、空实现和内存实现 | 已提供安全边界 |
@@ -271,6 +273,8 @@ profile = load_runtime_profile("runtime-profile.json")
 
 `PaperBroker` 是研究模型，不是交易所撮合模拟器。当前不完整模拟：
 
+- 限价单只允许使用提交时点之后的 K 线成交，避免同 K 线回看偏差
+
 - 盘口队列位置和排队成交概率
 - 部分成交与撤单竞争
 - 强平、自动减仓和保险基金
@@ -323,7 +327,7 @@ pytest
 - `MINOR`：向后兼容的新模块或能力
 - `PATCH`：向后兼容的修复和文档改进
 
-当前稳定标签：`v0.3.0`。
+当前稳定标签：`v0.4.0`。
 
 ### 路线图
 
@@ -360,10 +364,10 @@ production services, private strategy parameters, or third-party raw data.
 
 ### Current release
 
-- Version: `v0.3.0`
+- Version: `v0.4.0`
 - Python: `>= 3.11`
 - License: MIT
-- Tests: 18 passing
+- Tests: 23 passing
 - Default environment: research and paper trading
 - Live exchanges: abstract boundary only; no ready-to-trade implementation
 
@@ -423,9 +427,11 @@ closed live data -> snapshot adapter --/                              |
 | Realtime | Closed snapshots, event bus, thread-safe market state | Included |
 | Paper trading | Market/limit simulation, fees, slippage, positions, PnL | Simplified model |
 | Risk | Per-order, total-exposure, equity-fraction, and minimum-equity limits | Basic gates |
+| Portfolio risk | Open-position, daily-loss, and consecutive-loss circuit breakers | Session-level gate included |
 | Execution | Signal-to-order orchestration with risk first | Included |
 | Execution reliability | Order lifecycle, read backoff, write reconciliation, exact-payload approval | Generic components included |
-| Audit | Structured research and execution events | In-memory implementation |
+| Idempotency | Deterministic client order IDs for identical strategy decisions | Included |
+| Audit | Structured research and execution events | In-memory and SQLite implementations |
 | Data import | Normalized CSV parsing, duplicate checks, point-in-time availability | Included |
 | Performance | Compounded return, drawdown, win rate, profit factor, loss streak | Included |
 | Notifications | Protocol, null sink, and memory sink with no external delivery | Safe boundary included |
@@ -607,7 +613,8 @@ Before describing a result as potentially useful, verify that:
 ### PaperBroker limitations
 
 `PaperBroker` is a research model, not an exchange matching-engine simulator. It
-does not fully model queue position, partial fills, cancel races, liquidation,
+only allows limit fills from candles later than submission, preventing same-bar
+hindsight. It does not fully model queue position, partial fills, cancel races, liquidation,
 auto-deleveraging, funding, margin tiers, network uncertainty, exchange outages,
 gaps, or stop-price penetration. Paper results are not directly executable
 performance estimates.
@@ -646,7 +653,7 @@ The project follows semantic versioning:
 - `MINOR`: backward-compatible modules and capabilities
 - `PATCH`: backward-compatible fixes and documentation updates
 
-Current stable tag: `v0.3.0`.
+Current stable tag: `v0.4.0`.
 
 ### Roadmap
 

@@ -36,6 +36,7 @@ class PaperBroker(Broker):
         self.fees_paid = 0.0
         self.positions: dict[str, Position] = {}
         self.pending: dict[str, OrderRequest] = {}
+        self.pending_submitted_at_ms: dict[str, int] = {}
         self.fills: dict[str, Fill] = {}
 
     def submit(self, order: OrderRequest, *, timestamp_ms: int) -> Fill | None:
@@ -44,12 +45,15 @@ class PaperBroker(Broker):
         self._validate_reduce_only(order)
         if order.order_type == OrderType.LIMIT:
             self.pending[order.client_order_id] = order
+            self.pending_submitted_at_ms[order.client_order_id] = timestamp_ms
             return None
         price = self._market_fill_price(order)
         return self._fill(order, price=price, timestamp_ms=timestamp_ms)
 
     def cancel(self, client_order_id: str) -> bool:
-        return self.pending.pop(client_order_id, None) is not None
+        removed = self.pending.pop(client_order_id, None) is not None
+        self.pending_submitted_at_ms.pop(client_order_id, None)
+        return removed
 
     def on_candle(self, candle: Candle) -> list[Fill]:
         """Process pending limits against one subsequent closed candle."""
@@ -58,8 +62,12 @@ class PaperBroker(Broker):
         for order in list(self.pending.values()):
             if order.symbol != candle.symbol or order.limit_price is None:
                 continue
+            submitted_at_ms = self.pending_submitted_at_ms[order.client_order_id]
+            if candle.close_time_ms <= submitted_at_ms:
+                continue
             if candle.low <= order.limit_price <= candle.high:
                 self.pending.pop(order.client_order_id)
+                self.pending_submitted_at_ms.pop(order.client_order_id, None)
                 completed.append(
                     self._fill(order, price=order.limit_price, timestamp_ms=candle.close_time_ms)
                 )
