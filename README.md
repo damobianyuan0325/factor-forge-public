@@ -1,6 +1,6 @@
 # Factor Forge Public
 
-[![Version](https://img.shields.io/badge/version-v0.2.1-blue)](https://github.com/damobianyuan0325/factor-forge-public/tree/v0.2.1)
+[![Version](https://img.shields.io/badge/version-v0.3.0-blue)](https://github.com/damobianyuan0325/factor-forge-public/tree/v0.3.0)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-13%20passed-brightgreen)](#测试与质量门禁)
@@ -22,10 +22,10 @@ Factor Forge Public 将真实量化系统中具有通用价值的架构重新实
 
 ### 当前版本
 
-- 版本：`v0.2.1`
+- 版本：`v0.3.0`
 - Python：`>= 3.11`
 - 许可证：MIT
-- 测试：13 项通过
+- 测试：18 项通过
 - 默认执行环境：研究与模拟盘
 - 真实交易所：只提供抽象接口，不提供可直接下单的实现
 
@@ -82,7 +82,11 @@ Factor Forge Public 将真实量化系统中具有通用价值的架构重新实
 | 模拟盘 | 市价/限价模拟、费用、滑点、持仓和盈亏 | 已提供简化模型 |
 | 风控 | 单笔、总敞口、权益比例和最低权益限制 | 已提供基础门禁 |
 | 执行编排 | 信号转订单、风控前置、Broker 调用 | 已提供 |
+| 执行可靠性 | 订单状态机、读请求退避、写超时先对账、精确 payload 审批 | 已提供通用组件 |
 | 审计 | 结构化研究和执行事件 | 已提供内存实现 |
+| 数据导入 | 标准 CSV 解析、去重和决策时点可得性检查 | 已提供 |
+| 绩效统计 | 复利收益、最大回撤、胜率、Profit Factor、连续亏损 | 已提供 |
+| 通知 | 无外发的协议、空实现和内存实现 | 已提供安全边界 |
 | 真实交易所 | 签名、账户、下单、撤单和对账 | 仅定义私有扩展边界 |
 
 ### 项目目录
@@ -92,9 +96,9 @@ src/factor_forge_public/
 ├── brokers/       # Broker 抽象与 PaperBroker
 ├── config/        # 回放、模拟盘和私有实盘共用运行假设
 ├── data/          # 数据提供接口、调度和健康检查
-├── execution/     # 订单模型、仓位计算与执行编排
+├── execution/     # 订单模型、状态机、预检、重试、仓位与执行编排
 ├── factors/       # 因子协议、注册表、平均K线和K线形态
-├── monitoring/    # 结构化审计事件
+├── monitoring/    # 结构化审计事件与安全通知边界
 ├── realtime/      # 事件总线和线程安全市场状态
 ├── research/      # 事件研究、前向收益、切分与压力测试
 ├── strategies/    # 可公开的示例策略
@@ -319,7 +323,7 @@ pytest
 - `MINOR`：向后兼容的新模块或能力
 - `PATCH`：向后兼容的修复和文档改进
 
-当前稳定标签：`v0.2.1`。
+当前稳定标签：`v0.3.0`。
 
 ### 路线图
 
@@ -356,10 +360,10 @@ production services, private strategy parameters, or third-party raw data.
 
 ### Current release
 
-- Version: `v0.2.1`
+- Version: `v0.3.0`
 - Python: `>= 3.11`
 - License: MIT
-- Tests: 13 passing
+- Tests: 18 passing
 - Default environment: research and paper trading
 - Live exchanges: abstract boundary only; no ready-to-trade implementation
 
@@ -420,7 +424,11 @@ closed live data -> snapshot adapter --/                              |
 | Paper trading | Market/limit simulation, fees, slippage, positions, PnL | Simplified model |
 | Risk | Per-order, total-exposure, equity-fraction, and minimum-equity limits | Basic gates |
 | Execution | Signal-to-order orchestration with risk first | Included |
+| Execution reliability | Order lifecycle, read backoff, write reconciliation, exact-payload approval | Generic components included |
 | Audit | Structured research and execution events | In-memory implementation |
+| Data import | Normalized CSV parsing, duplicate checks, point-in-time availability | Included |
+| Performance | Compounded return, drawdown, win rate, profit factor, loss streak | Included |
+| Notifications | Protocol, null sink, and memory sink with no external delivery | Safe boundary included |
 | Live exchange | Signing, accounts, orders, cancellation, reconciliation | Private extension only |
 
 ### Repository layout
@@ -430,9 +438,9 @@ src/factor_forge_public/
 ├── brokers/       # Broker boundary and PaperBroker
 ├── config/        # Shared runtime assumptions
 ├── data/          # Provider protocol, scheduler, and health checks
-├── execution/     # Orders, sizing, and execution orchestration
+├── execution/     # Orders, lifecycle, preflight, retry, sizing, orchestration
 ├── factors/       # Factor protocol, registry, Heikin-Ashi, candle shape
-├── monitoring/    # Structured audit events
+├── monitoring/    # Structured audit events and safe notification boundary
 ├── realtime/      # Event bus and thread-safe market state
 ├── research/      # Events, returns, splits, and stress tests
 ├── strategies/    # Public example strategies
@@ -638,7 +646,7 @@ The project follows semantic versioning:
 - `MINOR`: backward-compatible modules and capabilities
 - `PATCH`: backward-compatible fixes and documentation updates
 
-Current stable tag: `v0.2.1`.
+Current stable tag: `v0.3.0`.
 
 ### Roadmap
 

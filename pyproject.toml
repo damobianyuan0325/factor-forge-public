@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "factor-forge-public"
-version = "0.2.1"
+version = "0.3.0"
 description = "Research-oriented tools for causal quantitative market studies"
 readme = "README.md"
 requires-python = ">=3.11"
