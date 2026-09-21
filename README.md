@@ -1,270 +1,667 @@
 # Factor Forge Public
 
-## 中文说明
+[![Version](https://img.shields.io/badge/version-v0.2.1-blue)](https://github.com/damobianyuan0325/factor-forge-public/tree/v0.2.1)
+[![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-13%20passed-brightgreen)](#测试与质量门禁)
 
-Factor Forge Public 是一个面向量化研究、因果回放、模拟交易和交易系统架构学习的开源框架。
+量化研究、因果回放、模拟交易与交易系统架构工具箱。
 
-本项目来自真实量化系统的架构经验，但公开版经过重新设计与脱敏，不包含私有策略、生产凭据、真实交易数据、本机路径、通知目标或交易所私有实现。
+An open-source toolkit for quantitative research, causal replay, paper trading,
+and trading-system architecture.
 
-### 设计原则
+---
 
-- 实盘、模拟盘和历史回放使用同一个策略入口。
-- 策略只能读取决策时刻已经收盘、已经可见的数据。
-- 数据接入、策略判断、风险检查和订单执行彼此分离。
-- 研究事件不等于交易信号，交易信号也不等于允许下单。
-- 回测必须考虑手续费、滑点、资金费率和成交不确定性。
-- 优先检验样本外稳定性与参数敏感性，而不是追求最高历史收益。
+## 中文
 
-### 系统板块
+### 项目定位
 
-#### 1. 市场数据层
+Factor Forge Public 将真实量化系统中具有通用价值的架构重新实现为安全、可读、可测试的公开版本。项目重点不是提供一个承诺盈利的策略，而是展示如何把数据、因子、策略、回放、模拟盘、风控和订单执行组织成一条可验证的链路。
 
-位置：`factor_forge_public.data`
+公开版与私有生产系统完全分离，不继承私有仓库历史，也不包含真实账户、交易凭据、生产服务配置、私有策略参数或第三方原始数据。
 
-负责定义统一的数据提供接口。历史数据库、文件和实时行情服务都可以实现 `MarketDataProvider`，但必须只返回指定时间点之前已经收盘的 K 线。`PollingScheduler` 负责与网络无关的采集任务调度，数据健康门负责检查历史长度、连续性、未来数据、未收盘数据和行情陈旧度。公开版不包含任何交易所密钥、第三方付费数据或真实历史数据库。
+### 当前版本
 
-#### 2. 标准数据模型
+- 版本：`v0.2.1`
+- Python：`>= 3.11`
+- 许可证：MIT
+- 测试：13 项通过
+- 默认执行环境：研究与模拟盘
+- 真实交易所：只提供抽象接口，不提供可直接下单的实现
 
-位置：`factor_forge_public.models`
+### 核心原则
 
-负责标准化 OHLCV K 线和研究事件，并验证时间、价格范围与数据完整性。其他模块只依赖标准模型，不直接依赖某一家交易所的数据格式。
+1. **一个策略入口**：回放、模拟盘和实时模式调用同一个 `Strategy.evaluate()`。
+2. **严格因果数据**：策略只能看到决策时刻已经收盘且已经可得的数据。
+3. **分层解耦**：数据、因子、信号、风控和执行互不越权。
+4. **信号不是订单**：`SignalPlan` 必须通过仓位计算和风险检查后才能进入 Broker。
+5. **成本必须显式**：手续费、滑点和成交限制属于策略评价的一部分。
+6. **先验证稳定性**：优先使用样本外、walk-forward、额外成本和删除最佳交易测试。
+7. **默认不接真实资金**：仓库自带的唯一 Broker 实现是 `PaperBroker`。
 
-#### 3. 因子与特征层
-
-位置：`factor_forge_public.factors`
-
-负责从历史可见数据生成可复现特征。`FactorRegistry` 提供统一注册和目录，当前包含因果版本的平均 K 线转换与 K 线形态因子。原始 K 线仍然是事实数据，衍生 K 线只用于研究和策略判断。
-
-#### 4. 研究与事件分析
-
-位置：`factor_forge_public.research`
-
-负责事件检测、前向收益标注、最大有利波动、最大不利波动和汇总统计。还提供严格按时间排序的训练/测试切分、扩展窗口 walk-forward、额外成本压力和删除最佳交易测试。事件先被独立检测，未来收益只能在离线评价阶段计算，不能反向进入事件条件。
-
-#### 5. 统一策略接口
-
-位置：`factor_forge_public.strategy`、`factor_forge_public.runtime`
-
-每个策略只实现一个 `Strategy.evaluate()`。策略代码不得根据 `LIVE` 或 `REPLAY` 编写两套判断逻辑。运行模式只描述数据来自哪里，不改变策略规则。相同的已收盘 K 线输入，实盘模式和回放模式必须生成相同的 `SignalPlan`。
-
-#### 6. 信号引擎
-
-位置：`factor_forge_public.engine`
-
-负责策略注册、最小数据长度检查和统一调用。`SignalPlan` 只是结构化研究信号，不会直接绕过风控发往交易所。
-
-#### 7. 历史回放入口
-
-位置：`factor_forge_public.replay`
-
-回放器按照时间顺序逐根增加已收盘 K 线。每次策略调用只能看到当时已经出现的前缀数据，因此不会把后续 K 线暴露给策略。
-
-#### 8. 实时与模拟入口
-
-位置：`factor_forge_public.live`
-
-实时入口接收最新的已收盘 K 线快照，并调用与回放完全相同的 `SignalEngine` 和策略对象。通用异步事件总线会隔离订阅者故障，线程安全的 `MarketState` 保存当前和最近已收盘 K 线。该入口只生成信号，不包含交易所请求。
-
-#### 9. 风控与仓位管理
-
-位置：`factor_forge_public.risk`、`factor_forge_public.execution.sizing`
-
-负责检查单笔名义价值、总风险敞口、账户权益比例和最低权益，并按照权益比例、杠杆及合约最小数量计算仓位。所有订单必须先通过风控。
-
-#### 10. 订单与执行编排
-
-位置：`factor_forge_public.execution`
-
-负责标准订单、成交、持仓和账户模型。`ExecutionService` 将策略信号转换为订单意图，执行风险检查，然后才调用 Broker。公开版不会自动连接真实交易所。
-
-#### 11. 模拟盘
-
-位置：`factor_forge_public.brokers.paper`
-
-`PaperBroker` 提供确定性的研究模拟：
-
-- 市价单按参考价加滑点成交。
-- 限价单只能在后续传入的 K 线触及价格后成交。
-- 计算手续费、持仓均价、已实现盈亏和未实现盈亏。
-- 检查 `reduce_only`，避免模拟减仓单反向扩大仓位。
-
-这是简化成交模型，不能替代盘口队列、部分成交、爆仓、资金费率和交易所故障模拟。
-
-#### 12. 交易所适配边界
-
-位置：`factor_forge_public.brokers.base`
-
-`Broker` 定义提交订单、取消订单和查询账户的抽象接口。开发者可以在自己的私有项目中实现真实交易所适配器。为避免误下单和凭据泄露，本仓库不提供任何真实交易所签名代码、API 地址、账户读取或生产下单实现。
-
-#### 13. 审计与可观测性
-
-位置：`factor_forge_public.monitoring`
-
-负责记录数据、信号、风控和执行阶段的结构化事件。当前公开版提供内存审计实现，实际项目可以扩展到数据库或日志平台。
-
-#### 14. 统一运行配置
-
-位置：`factor_forge_public.config`
-
-负责用同一份配置描述回放、模拟盘和私有实盘适配器的本金、仓位比例、杠杆、手续费、滑点和风险上限，避免不同运行模式悄悄使用不同假设。
-
-### 统一运行链路
+### 架构
 
 ```text
-历史数据 -> 逐根回放入口 ----\
-                              -> SignalEngine -> 同一个 Strategy.evaluate()
-实时收盘K线 -> 实时入口 ------/
-                                           |
-                                           v
-                                      SignalPlan
-                                           |
-                                           v
-                                      RiskEngine
-                                           |
-                                           v
-                                   ExecutionService
-                                           |
-                          +----------------+----------------+
-                          |                                 |
-                          v                                 v
-                     PaperBroker                    私有 Broker 实现
-                     模拟成交                        真实交易所适配
+历史数据源 -> 逐根回放入口 ----\
+                                 -> 数据健康门 -> 因子注册表 -> SignalEngine
+实时收盘K线 -> 实时快照入口 ----/                              |
+                                                                v
+                                                    同一个 Strategy.evaluate()
+                                                                |
+                                                                v
+                                                          SignalPlan
+                                                                |
+                                              +-----------------+-----------------+
+                                              |                                   |
+                                              v                                   v
+                                         研究记录                          仓位与 RiskEngine
+                                                                                  |
+                                                                                  v
+                                                                          ExecutionService
+                                                                                  |
+                                                        +-------------------------+----------------+
+                                                        |                                          |
+                                                        v                                          v
+                                                   PaperBroker                            私有 Broker 适配器
+                                                   模拟成交                                真实交易所边界
 ```
 
-### 已排除的私有内容
+### 功能状态
 
-- 私有策略版本和优化参数
-- 实盘账户、API Key、私钥和 Broker ID
-- 真实通知目标、用户标识和本机目录
-- HTX 或其他交易所的私有签名与生产执行代码
-- LaunchAgent、生产服务名和部署配置
-- CoinAnk 或其他第三方原始数据
-- SQLite 数据库、日志、订单记录和回测报告
-- 私有仓库的 Git 历史
+| 板块 | 负责内容 | 当前状态 |
+| --- | --- | --- |
+| 数据模型 | 标准 OHLCV、研究事件、时间和价格验证 | 已提供 |
+| 数据接口 | 历史/实时数据源协议、轮询调度 | 已提供抽象 |
+| 数据健康 | 连续性、陈旧度、未来数据、未收盘数据检查 | 已提供 |
+| 因子系统 | 因子协议、注册表、目录和特征富化 | 已提供 |
+| 研究工具 | 事件研究、前向收益、MFE/MAE、汇总统计 | 已提供 |
+| 稳健性 | 时间切分、walk-forward、成本和删最佳交易压力测试 | 已提供 |
+| 策略系统 | 注册表、统一输入、统一输出、示例策略 | 已提供 |
+| 历史回放 | 逐根 K 线推进，禁止暴露未来数据 | 已提供 |
+| 实时入口 | 已收盘快照、事件总线、线程安全市场状态 | 已提供 |
+| 模拟盘 | 市价/限价模拟、费用、滑点、持仓和盈亏 | 已提供简化模型 |
+| 风控 | 单笔、总敞口、权益比例和最低权益限制 | 已提供基础门禁 |
+| 执行编排 | 信号转订单、风控前置、Broker 调用 | 已提供 |
+| 审计 | 结构化研究和执行事件 | 已提供内存实现 |
+| 真实交易所 | 签名、账户、下单、撤单和对账 | 仅定义私有扩展边界 |
 
-### 安装与测试
+### 项目目录
+
+```text
+src/factor_forge_public/
+├── brokers/       # Broker 抽象与 PaperBroker
+├── config/        # 回放、模拟盘和私有实盘共用运行假设
+├── data/          # 数据提供接口、调度和健康检查
+├── execution/     # 订单模型、仓位计算与执行编排
+├── factors/       # 因子协议、注册表、平均K线和K线形态
+├── monitoring/    # 结构化审计事件
+├── realtime/      # 事件总线和线程安全市场状态
+├── research/      # 事件研究、前向收益、切分与压力测试
+├── strategies/    # 可公开的示例策略
+├── engine.py      # 统一信号引擎
+├── live.py        # 实时/模拟快照入口
+├── models.py      # 标准 Candle 与 ResearchEvent
+├── replay.py      # 因果逐根回放入口
+├── runtime.py     # RunMode、StrategyInput、SignalPlan
+└── strategy.py    # Strategy 与 StrategyRegistry
+```
+
+### 安装
 
 ```bash
+git clone https://github.com/damobianyuan0325/factor-forge-public.git
+cd factor-forge-public
 python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
+```
+
+Windows PowerShell：
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+```
+
+### 快速开始：事件研究
+
+仓库自带的示例只使用合成数据：
+
+```bash
 python examples/synthetic_event_study.py
+```
+
+它会依次完成：生成合成 K 线、检测成交量异常、计算未来 4/12 根 K 线收益、汇总正收益比例与最大有利/不利波动。
+
+核心调用方式：
+
+```python
+from factor_forge_public.research import (
+    evaluate_forward_returns,
+    summarize_returns,
+    volume_spike_events,
+)
+
+events = volume_spike_events(candles, lookback=20, multiplier=2.0)
+outcomes = evaluate_forward_returns(candles, events, horizons=(4, 12, 24))
+summary = summarize_returns(outcomes)
+```
+
+未来收益只在事件生成完成后计算，不能作为事件条件或策略输入。
+
+### 快速开始：同一策略用于回放和实时入口
+
+```python
+from factor_forge_public.engine import SignalEngine
+from factor_forge_public.live import evaluate_closed_snapshot
+from factor_forge_public.replay import replay_closed_candles
+from factor_forge_public.strategies import MovingAverageCross
+from factor_forge_public.strategy import StrategyRegistry
+
+registry = StrategyRegistry()
+registry.register(MovingAverageCross(fast_window=5, slow_window=20))
+engine = SignalEngine(registry)
+
+replay_plans = replay_closed_candles(
+    engine,
+    strategy_id="example.moving_average_cross",
+    candles=candles,
+    warmup_bars=21,
+)
+
+live_plan = evaluate_closed_snapshot(
+    engine,
+    strategy_id="example.moving_average_cross",
+    candles=candles,
+)
+```
+
+在可见 K 线完全相同时，最后一个回放结果必须与实时入口结果一致。测试会检查这一约束。
+
+### 快速开始：模拟下单与风控
+
+```python
+from factor_forge_public.brokers import PaperBroker
+from factor_forge_public.execution.service import ExecutionService
+from factor_forge_public.risk import RiskEngine, RiskLimits
+
+broker = PaperBroker(
+    initial_cash=10_000.0,
+    fee_bps=4.0,
+    slippage_bps=2.0,
+)
+risk = RiskEngine(
+    RiskLimits(
+        max_order_notional=1_000.0,
+        max_total_notional=5_000.0,
+        max_equity_fraction_per_order=0.20,
+    )
+)
+execution = ExecutionService(broker=broker, risk_engine=risk)
+
+result = execution.submit_market_signal(
+    signal_plan,
+    quantity=0.01,
+    timestamp_ms=signal_plan.observed_at_ms,
+)
+```
+
+`ExecutionService` 不允许信号绕过风险检查。真实 Broker 应在私有仓库实现，并继续遵守同一个接口和风险前置顺序。
+
+### 统一运行配置
+
+```json
+{
+  "profile_id": "research-default",
+  "symbols": ["BTC-USDT"],
+  "timeframes": ["15m"],
+  "capital": {
+    "initial_equity": 10000,
+    "equity_fraction_per_order": 0.1,
+    "leverage": 1
+  },
+  "costs": {
+    "fee_bps_per_side": 4,
+    "slippage_bps_per_side": 2
+  },
+  "guards": {
+    "maximum_order_notional": 1000,
+    "maximum_total_notional": 5000,
+    "maximum_open_positions": 1
+  }
+}
+```
+
+```python
+from factor_forge_public.config import load_runtime_profile
+
+profile = load_runtime_profile("runtime-profile.json")
+```
+
+同一份成本、资金和风险假设应同时用于回放、模拟盘和私有实盘适配器，避免结果因配置漂移而失真。
+
+### 编写自己的策略
+
+1. 继承 `Strategy`。
+2. 声明稳定的 `strategy_id`、`version` 和 `minimum_candles`。
+3. 只在 `evaluate()` 中读取 `StrategyInput`。
+4. 不根据 `RunMode` 改变策略规则。
+5. 返回 `SignalPlan`，不要直接调用 Broker。
+6. 添加 live/replay 一致性测试和前缀不变性测试。
+
+### 研究验证清单
+
+在把研究结论称为“可能有效”之前，至少检查：
+
+- 信号只使用当时已经可得的数据。
+- 训练集与测试集严格按时间隔离。
+- 手续费、滑点、资金费率和成交失败已经建模。
+- 参数轻微变化后结果没有立即崩溃。
+- 删除最赚钱的少数交易后仍有合理表现。
+- 多个独立市场阶段中存在正向证据。
+- 最大回撤、连续亏损和尾部风险可以承受。
+- 回放、模拟盘和实时影子运行使用相同策略代码。
+
+### PaperBroker 的已知限制
+
+`PaperBroker` 是研究模型，不是交易所撮合模拟器。当前不完整模拟：
+
+- 盘口队列位置和排队成交概率
+- 部分成交与撤单竞争
+- 强平、自动减仓和保险基金
+- 资金费率、借贷利息和保证金梯度
+- 网络超时、请求状态不确定与交易所停机
+- 极端行情中的跳空和止损穿透
+
+因此模拟收益不能直接视为可实盘收益。
+
+### 安全边界
+
+仓库刻意不包含：
+
+- 私有策略版本、机会库和优化参数
+- API Key、私钥、账户号、Broker ID 和通知目标
+- 真实交易所签名、生产下单、撤单和账户读取代码
+- 本机绝对路径、LaunchAgent 和生产服务配置
+- CoinAnk 或其他第三方原始数据
+- SQLite 数据库、订单台账、日志和私人回测报告
+- 私有仓库 Git 历史
+
+请不要在 issue、测试样例或提交中发布真实凭据。若凭据曾经进入 Git 历史，应立即轮换凭据并清理完整历史，仅删除当前文件是不够的。
+
+### 测试与质量门禁
+
+```bash
 pytest
 ```
 
-测试包括未来数据拦截、未收盘 K 线拦截，以及相同数据下实盘与回放信号一致性。
+当前测试覆盖：
+
+- Candle 数据验证
+- 平均 K 线因果计算
+- 事件检测前缀不变性
+- 未来数据和未收盘 K 线拦截
+- live/replay 策略结果一致性
+- 模拟盘手续费、持仓与已实现盈亏
+- 超限订单风险拒绝
+- 数据连续性与陈旧度检查
+- 轮询调度确定性
+- 事件订阅者故障隔离
+- walk-forward 时间边界
+- 成本和删除最佳交易压力测试
+
+### 版本规则
+
+项目遵循语义化版本：
+
+- `MAJOR`：不兼容的公共接口变化
+- `MINOR`：向后兼容的新模块或能力
+- `PATCH`：向后兼容的修复和文档改进
+
+当前稳定标签：`v0.2.1`。
+
+### 路线图
+
+- 更严格的回测成交模型和资金曲线统计
+- 通用止盈、止损和订单生命周期状态机
+- 参数敏感性与分阶段报告
+- 可插拔数据存储接口
+- 研究结果导出和可视化
+- 更多不包含私有 alpha 的教学策略
+
+### 贡献
+
+欢迎提交通用研究工具、测试、文档和安全修复。请勿提交真实凭据、生产日志、第三方受限数据或无法说明来源的策略材料。
 
 ### 风险声明
 
-本项目仅用于研究和教育，不构成投资建议。历史回放和模拟交易不能代表未来收益。连接真实资金前，使用者必须自行完成数据质量、交易成本、风控、权限、合规和极端行情测试。
+本项目仅用于研究和教育，不构成投资建议。历史回放和模拟交易不能代表未来收益。连接真实资金前，使用者必须自行完成数据质量、交易成本、权限、合规、风控和极端行情测试。
 
 ---
 
 ## English
 
-Factor Forge Public is an open-source framework for quantitative research,
-causal replay, paper trading, and trading-system architecture education.
+### Purpose
 
-It reflects lessons from a real quantitative system, but this public edition is
-redesigned and sanitized. It contains no private strategies, production
-credentials, real trading data, local paths, notification targets, or private
-exchange implementations.
+Factor Forge Public reimplements reusable lessons from a real quantitative
+system as a safe, readable, and tested open-source project. It does not promise
+a profitable strategy. Its purpose is to show how market data, factors,
+strategies, causal replay, paper trading, risk controls, and order execution can
+form one verifiable pipeline.
 
-### Design principles
+The public project is fully separated from the private production system. It
+does not inherit private Git history or include real accounts, credentials,
+production services, private strategy parameters, or third-party raw data.
 
-- Live, paper, and replay modes use the same strategy entrypoint.
-- A strategy may read only data that was closed and observable at decision time.
-- Data ingestion, strategy evaluation, risk checks, and execution are separated.
-- A research event is not a signal, and a signal is not permission to trade.
-- Fees, slippage, funding, and fill uncertainty belong in practical evaluation.
-- Out-of-sample stability and parameter sensitivity matter more than peak returns.
+### Current release
 
-### System modules
+- Version: `v0.2.1`
+- Python: `>= 3.11`
+- License: MIT
+- Tests: 13 passing
+- Default environment: research and paper trading
+- Live exchanges: abstract boundary only; no ready-to-trade implementation
 
-1. **Market data** (`factor_forge_public.data`) defines a vendor-neutral,
-   point-in-time provider, pure polling scheduler, and causal data-health gate.
-2. **Models** (`factor_forge_public.models`) validate normalized OHLCV candles
-   and research events.
-3. **Factors** (`factor_forge_public.factors`) provide a registry and calculate
-   reproducible candle-shape and causal Heikin-Ashi features.
-4. **Research** (`factor_forge_public.research`) detects events, evaluates
-   forward returns, builds walk-forward splits, and runs cost and best-trade
-   removal stress tests.
-5. **Unified strategies** (`factor_forge_public.strategy`, `.runtime`) expose
-   one deterministic `Strategy.evaluate()` method for every runtime mode.
-6. **Signal engine** (`factor_forge_public.engine`) routes validated inputs to a
-   registered strategy.
-7. **Replay** (`factor_forge_public.replay`) advances one closed candle at a time
-   without exposing future observations.
-8. **Live/paper input and realtime state** (`factor_forge_public.live`,
-   `.realtime`) evaluate closed snapshots, isolate event-handler failures, and
-   maintain thread-safe current and last-closed candle state.
-9. **Risk and sizing** (`factor_forge_public.risk`, `.execution.sizing`) enforce
-   exposure limits and calculate exchange-compatible quantities.
-10. **Execution models and orchestration** (`factor_forge_public.execution`)
-    convert approved signals into broker requests only after risk checks.
-11. **Paper trading** (`factor_forge_public.brokers.paper`) models fees,
-    slippage, positions, PnL, market fills, and later-candle limit fills.
-12. **Exchange boundary** (`factor_forge_public.brokers.base`) defines the
-    interface for private broker adapters without shipping live credentials or
-    exchange-specific signing code.
-13. **Audit and observability** (`factor_forge_public.monitoring`) record
-    structured decisions across the research and execution pipeline.
-14. **Runtime profiles** (`factor_forge_public.config`) keep capital, cost,
-    sizing, leverage, and guard assumptions aligned across runtime modes.
+### Core principles
 
-### One strategy, multiple runtimes
+1. **One strategy entrypoint:** replay, paper, and live modes call the same
+   `Strategy.evaluate()` method.
+2. **Causal inputs:** strategies may only read data closed and observable at the
+   decision timestamp.
+3. **Separated responsibilities:** data, factors, signals, risk, and execution
+   cannot silently bypass each other.
+4. **A signal is not an order:** every `SignalPlan` must pass sizing and risk
+   controls before reaching a Broker.
+5. **Explicit costs:** fees, slippage, and fill constraints belong in evaluation.
+6. **Stability before peak returns:** use out-of-sample, walk-forward, extra-cost,
+   and best-trade-removal tests.
+7. **No real capital by default:** `PaperBroker` is the only included Broker.
+
+### Architecture
 
 ```text
-historical candles -> causal replay ----\
-                                      -> SignalEngine -> Strategy.evaluate()
-closed live candles -> live adapter ---/
-                                                |
-                                                v
-                                           SignalPlan
-                                                |
-                                                v
-                                           RiskEngine
-                                                |
-                                                v
-                                        ExecutionService
-                                                |
-                               +----------------+----------------+
-                               |                                 |
-                               v                                 v
-                          PaperBroker                  private Broker adapter
+historical source -> candle replay ----\
+                                       -> health gate -> factors -> SignalEngine
+closed live data -> snapshot adapter --/                              |
+                                                                        v
+                                                            Strategy.evaluate()
+                                                                        |
+                                                                        v
+                                                                   SignalPlan
+                                                                        |
+                                                     +------------------+---------------+
+                                                     |                                  |
+                                                     v                                  v
+                                                research log                    sizing + RiskEngine
+                                                                                        |
+                                                                                        v
+                                                                                ExecutionService
+                                                                                        |
+                                                             +--------------------------+--------------+
+                                                             |                                         |
+                                                             v                                         v
+                                                        PaperBroker                        private Broker adapter
 ```
 
-Given the same visible closed candles, replay and live modes must produce the
-same `SignalPlan`. Tests enforce runtime parity and reject future or open candles.
+### Feature status
 
-### Deliberately excluded
+| Module | Responsibility | Status |
+| --- | --- | --- |
+| Data models | Normalized OHLCV, research events, time and price validation | Included |
+| Data boundary | Historical/live provider protocol and polling scheduler | Abstract interface |
+| Data health | Continuity, staleness, future-data, and open-candle checks | Included |
+| Factors | Protocol, registry, catalog, and feature enrichment | Included |
+| Research | Event studies, forward returns, MFE/MAE, summary statistics | Included |
+| Robustness | Time splits, walk-forward, cost and best-trade-removal stress | Included |
+| Strategies | Registry, shared input/output contract, example strategy | Included |
+| Replay | Candle-by-candle causal evaluation | Included |
+| Realtime | Closed snapshots, event bus, thread-safe market state | Included |
+| Paper trading | Market/limit simulation, fees, slippage, positions, PnL | Simplified model |
+| Risk | Per-order, total-exposure, equity-fraction, and minimum-equity limits | Basic gates |
+| Execution | Signal-to-order orchestration with risk first | Included |
+| Audit | Structured research and execution events | In-memory implementation |
+| Live exchange | Signing, accounts, orders, cancellation, reconciliation | Private extension only |
 
-- Private strategy versions and optimized parameters
-- API keys, private keys, account identifiers, and broker identifiers
-- Notification targets, personal identifiers, and local machine paths
-- Private exchange signing or production execution code
-- Production services and deployment configuration
-- Third-party raw datasets, databases, logs, order ledgers, and private reports
-- Git history from the private repository
+### Repository layout
 
-### Installation and tests
+```text
+src/factor_forge_public/
+├── brokers/       # Broker boundary and PaperBroker
+├── config/        # Shared runtime assumptions
+├── data/          # Provider protocol, scheduler, and health checks
+├── execution/     # Orders, sizing, and execution orchestration
+├── factors/       # Factor protocol, registry, Heikin-Ashi, candle shape
+├── monitoring/    # Structured audit events
+├── realtime/      # Event bus and thread-safe market state
+├── research/      # Events, returns, splits, and stress tests
+├── strategies/    # Public example strategies
+├── engine.py      # Shared signal engine
+├── live.py        # Live/paper closed-snapshot adapter
+├── models.py      # Candle and ResearchEvent
+├── replay.py      # Causal candle replay
+├── runtime.py     # RunMode, StrategyInput, SignalPlan
+└── strategy.py    # Strategy and StrategyRegistry
+```
+
+### Installation
 
 ```bash
+git clone https://github.com/damobianyuan0325/factor-forge-public.git
+cd factor-forge-public
 python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
+```
+
+On Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+```
+
+### Quick start: event study
+
+The included example uses synthetic data only:
+
+```bash
 python examples/synthetic_event_study.py
+```
+
+```python
+from factor_forge_public.research import (
+    evaluate_forward_returns,
+    summarize_returns,
+    volume_spike_events,
+)
+
+events = volume_spike_events(candles, lookback=20, multiplier=2.0)
+outcomes = evaluate_forward_returns(candles, events, horizons=(4, 12, 24))
+summary = summarize_returns(outcomes)
+```
+
+Forward outcomes are calculated only after event generation and must never feed
+back into event conditions or strategy inputs.
+
+### Quick start: one strategy for replay and live inputs
+
+```python
+from factor_forge_public.engine import SignalEngine
+from factor_forge_public.live import evaluate_closed_snapshot
+from factor_forge_public.replay import replay_closed_candles
+from factor_forge_public.strategies import MovingAverageCross
+from factor_forge_public.strategy import StrategyRegistry
+
+registry = StrategyRegistry()
+registry.register(MovingAverageCross(fast_window=5, slow_window=20))
+engine = SignalEngine(registry)
+
+replay_plans = replay_closed_candles(
+    engine,
+    strategy_id="example.moving_average_cross",
+    candles=candles,
+    warmup_bars=21,
+)
+live_plan = evaluate_closed_snapshot(
+    engine,
+    strategy_id="example.moving_average_cross",
+    candles=candles,
+)
+```
+
+For identical visible closed candles, the final replay result must equal the
+live-adapter result. Tests enforce this invariant.
+
+### Quick start: paper execution and risk
+
+```python
+from factor_forge_public.brokers import PaperBroker
+from factor_forge_public.execution.service import ExecutionService
+from factor_forge_public.risk import RiskEngine, RiskLimits
+
+broker = PaperBroker(initial_cash=10_000.0, fee_bps=4.0, slippage_bps=2.0)
+risk = RiskEngine(
+    RiskLimits(
+        max_order_notional=1_000.0,
+        max_total_notional=5_000.0,
+        max_equity_fraction_per_order=0.20,
+    )
+)
+execution = ExecutionService(broker=broker, risk_engine=risk)
+
+result = execution.submit_market_signal(
+    signal_plan,
+    quantity=0.01,
+    timestamp_ms=signal_plan.observed_at_ms,
+)
+```
+
+`ExecutionService` never allows a signal to bypass risk checks. Real Broker
+implementations should remain private and preserve the same risk-first order.
+
+### Shared runtime profile
+
+```json
+{
+  "profile_id": "research-default",
+  "symbols": ["BTC-USDT"],
+  "timeframes": ["15m"],
+  "capital": {
+    "initial_equity": 10000,
+    "equity_fraction_per_order": 0.1,
+    "leverage": 1
+  },
+  "costs": {
+    "fee_bps_per_side": 4,
+    "slippage_bps_per_side": 2
+  },
+  "guards": {
+    "maximum_order_notional": 1000,
+    "maximum_total_notional": 5000,
+    "maximum_open_positions": 1
+  }
+}
+```
+
+```python
+from factor_forge_public.config import load_runtime_profile
+
+profile = load_runtime_profile("runtime-profile.json")
+```
+
+Replay, paper, and private live adapters should use the same capital, cost, and
+risk assumptions to avoid silent configuration drift.
+
+### Implementing a strategy
+
+1. Subclass `Strategy`.
+2. Declare stable `strategy_id`, `version`, and `minimum_candles` values.
+3. Read only `StrategyInput` inside `evaluate()`.
+4. Do not change trading rules based on `RunMode`.
+5. Return a `SignalPlan`; never call a Broker directly.
+6. Add replay/live parity and prefix-invariance tests.
+
+### Research validation checklist
+
+Before describing a result as potentially useful, verify that:
+
+- every signal uses only information available at the decision timestamp;
+- training and test periods are separated chronologically;
+- fees, slippage, funding, and failed fills are represented;
+- small parameter changes do not immediately destroy results;
+- results remain reasonable after removing the best trades;
+- evidence exists across multiple independent market regimes;
+- drawdown, loss streaks, and tail risk are tolerable; and
+- replay, paper, and live-shadow modes run the same strategy code.
+
+### PaperBroker limitations
+
+`PaperBroker` is a research model, not an exchange matching-engine simulator. It
+does not fully model queue position, partial fills, cancel races, liquidation,
+auto-deleveraging, funding, margin tiers, network uncertainty, exchange outages,
+gaps, or stop-price penetration. Paper results are not directly executable
+performance estimates.
+
+### Security boundary
+
+This repository deliberately excludes:
+
+- private strategy versions, opportunity libraries, and optimized parameters;
+- API keys, private keys, accounts, broker identifiers, and notification targets;
+- live exchange signing, account access, production orders, and cancellation;
+- local absolute paths, production services, and deployment configuration;
+- third-party restricted datasets;
+- databases, order ledgers, logs, private reports, and private Git history.
+
+Never post real credentials in issues, fixtures, or commits. If a credential
+enters Git history, rotate it immediately and purge the full history; deleting
+the latest file is not sufficient.
+
+### Tests and quality gates
+
+```bash
 pytest
 ```
+
+Coverage includes candle validation, causal Heikin-Ashi, event-prefix
+invariance, future/open-candle rejection, replay/live parity, paper fees and PnL,
+risk rejection, data continuity and staleness, deterministic polling, subscriber
+failure isolation, walk-forward boundaries, and robustness stress tests.
+
+### Versioning
+
+The project follows semantic versioning:
+
+- `MAJOR`: incompatible public API changes
+- `MINOR`: backward-compatible modules and capabilities
+- `PATCH`: backward-compatible fixes and documentation updates
+
+Current stable tag: `v0.2.1`.
+
+### Roadmap
+
+- More realistic fill and equity-curve modeling
+- Generic stop-loss, take-profit, and order-lifecycle state machines
+- Parameter-sensitivity and regime reports
+- Pluggable storage interfaces
+- Research export and visualization
+- Additional educational strategies without private alpha
+
+### Contributing
+
+Contributions to generic research tools, tests, documentation, and security are
+welcome. Do not submit real credentials, production logs, restricted third-party
+data, or strategy material without clear redistribution rights.
 
 ### Disclaimer
 
 This project is for research and education only and is not investment advice.
 Historical replay and paper trading do not predict future performance. Users are
-responsible for validating data, execution costs, risk controls, permissions,
-compliance, and extreme-market behavior before connecting real capital.
+responsible for data quality, costs, permissions, compliance, risk controls, and
+extreme-market testing before connecting real capital.
 
 ## License
 
-MIT
+[MIT](LICENSE)
