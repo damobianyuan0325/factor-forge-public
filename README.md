@@ -1,6 +1,6 @@
 # Factor Forge Public
 
-[![Version](https://img.shields.io/badge/version-v0.4.0-blue)](https://github.com/damobianyuan0325/factor-forge-public/tree/v0.4.0)
+[![Version](https://img.shields.io/badge/version-v0.4.1-blue)](https://github.com/damobianyuan0325/factor-forge-public/tree/v0.4.1)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-23%20passed-brightgreen)](#测试与质量门禁)
@@ -10,19 +10,25 @@
 An open-source toolkit for quantitative research, causal replay, paper trading,
 and trading-system architecture.
 
+> **Research use only:** this repository is not a trading bot and is not a
+> ready-to-deploy order execution system. Do not connect it directly to a real
+> account or use the examples to place real-money orders.
+
 ---
 
 ## 中文
 
 ### 项目定位
 
+> **重要说明：本仓库只供量化研究、架构学习、因果回放和模拟实验使用。它不是可直接部署的交易机器人，也不是完整的实盘下单系统。请勿把仓库中的示例、模拟 Broker 或执行组件直接连接真实账户和真实资金。**
+
 Factor Forge Public 将真实量化系统中具有通用价值的架构重新实现为安全、可读、可测试的公开版本。项目重点不是提供一个承诺盈利的策略，而是展示如何把数据、因子、策略、回放、模拟盘、风控和订单执行组织成一条可验证的链路。
 
-公开版与私有生产系统完全分离，不继承私有仓库历史，也不包含真实账户、交易凭据、生产服务配置、私有策略参数或第三方原始数据。
+公开版与私有生产系统完全分离，不继承私有仓库历史，也不包含真实账户、交易凭据、生产服务配置、私有策略参数或第三方原始数据。仓库中出现的“实时”“执行”“订单”等接口用于研究系统边界、模拟流程和测试设计，不代表已经具备真实交易所接入所需的完整安全能力。
 
 ### 当前版本
 
-- 版本：`v0.4.0`
+- 版本：`v0.4.1`
 - Python：`>= 3.11`
 - 许可证：MIT
 - 测试：23 项通过
@@ -113,6 +119,8 @@ src/factor_forge_public/
 ```
 
 ### 安装
+
+安装仅用于本地研究、测试和阅读代码。请使用隔离的开发环境，不要在安装后配置真实 API Key，也不要把示例 Broker 替换成真实下单接口后直接投入资金。
 
 ```bash
 git clone https://github.com/damobianyuan0325/factor-forge-public.git
@@ -327,7 +335,7 @@ pytest
 - `MINOR`：向后兼容的新模块或能力
 - `PATCH`：向后兼容的修复和文档改进
 
-当前稳定标签：`v0.4.0`。
+当前稳定标签：`v0.4.1`。
 
 ### 路线图
 
@@ -344,13 +352,19 @@ pytest
 
 ### 风险声明
 
-本项目仅用于研究和教育，不构成投资建议。历史回放和模拟交易不能代表未来收益。连接真实资金前，使用者必须自行完成数据质量、交易成本、权限、合规、风控和极端行情测试。
+本项目仅用于研究和教育，不构成投资建议，也不提供可直接运行的实盘交易方案。历史回放和模拟交易不能代表未来收益。仓库中的 `PaperBroker`、订单模型、执行编排、重试和风控组件均为研究示例，未覆盖真实交易所全部成交规则、故障模式、权限控制和资金安全要求。维护者不建议也不支持将本仓库直接用于真实下单；任何人不得把示例代码的存在理解为实盘适用性或收益保证。
 
 ---
 
 ## English
 
 ### Purpose
+
+> **Important: this repository is for quantitative research, architecture
+> study, causal replay, and paper experiments only. It is not a deployable
+> trading bot or a complete live-order system. Do not connect its examples,
+> paper broker, or execution components directly to a real account or real
+> capital.**
 
 Factor Forge Public reimplements reusable lessons from a real quantitative
 system as a safe, readable, and tested open-source project. It does not promise
@@ -361,10 +375,13 @@ form one verifiable pipeline.
 The public project is fully separated from the private production system. It
 does not inherit private Git history or include real accounts, credentials,
 production services, private strategy parameters, or third-party raw data.
+References to live data, execution, or orders describe research boundaries,
+simulated workflows, and testable interfaces; they do not imply production
+readiness or complete exchange safety controls.
 
 ### Current release
 
-- Version: `v0.4.0`
+- Version: `v0.4.1`
 - Python: `>= 3.11`
 - License: MIT
 - Tests: 23 passing
@@ -459,6 +476,10 @@ src/factor_forge_public/
 ```
 
 ### Installation
+
+Installation is intended for local research, testing, and source-code study.
+Use an isolated development environment. Do not configure real API credentials
+or replace the example broker with a live adapter and then deploy real capital.
 
 ```bash
 git clone https://github.com/damobianyuan0325/factor-forge-public.git
@@ -653,7 +674,7 @@ The project follows semantic versioning:
 - `MINOR`: backward-compatible modules and capabilities
 - `PATCH`: backward-compatible fixes and documentation updates
 
-Current stable tag: `v0.4.0`.
+Current stable tag: `v0.4.1`.
 
 ### Roadmap
 
@@ -672,10 +693,14 @@ data, or strategy material without clear redistribution rights.
 
 ### Disclaimer
 
-This project is for research and education only and is not investment advice.
-Historical replay and paper trading do not predict future performance. Users are
-responsible for data quality, costs, permissions, compliance, risk controls, and
-extreme-market testing before connecting real capital.
+This project is for research and education only. It is neither investment
+advice nor a ready-to-run live trading solution. Historical replay and paper
+trading do not predict future performance. `PaperBroker`, order models,
+execution orchestration, retry logic, and risk components are research examples
+that do not cover every exchange rule, failure mode, permission control, or
+capital-safety requirement. The maintainers do not recommend or support using
+this repository directly for real-money order placement, and no included
+example should be interpreted as live suitability or a performance guarantee.
 
 ## License
 
